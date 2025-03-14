@@ -133,10 +133,9 @@ class Simulator:
                 self.price_level_queue.put((bids,asks,timestamp_str, sequence_number))
                 up = self.binary_classifier.create_inference_vector(bids, asks, timestamp_str)
 
-                update_lag = self.binary_classifier.update_lag
-                sell_sequence_num = sequence_number + update_lag
-
                 if up:
+                    update_lag = self.binary_classifier.update_lag
+                    sell_sequence_num = sequence_number + update_lag
                     refined_trade = Trade(buy_price=curr_mid_price, buy_sequence_number=sequence_number, sell_sequence_number=sell_sequence_num)
                     self.exposure.append(refined_trade)
 
