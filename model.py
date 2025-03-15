@@ -31,9 +31,9 @@ class BinaryClassifier:
 
         inf_df = pd.DataFrame([inf_row])
 
-        inf_df = self.bc_time_independent_features(inf_df, self.price_level_num)
+        inf_df = self.time_independent_features(inf_df, self.price_level_num)
 
-        inf_df = self.bc_time_dependent_features(inf_df, [1,2,5,10])
+        inf_df = self.time_dependent_features(inf_df, [1,2,5,10])
 
         feature_columns = [
             # 'Mid Price', 
@@ -50,12 +50,12 @@ class BinaryClassifier:
             # 'Ask Volume Level 5','Ask Volume Level 6','Ask Volume Level 7', 'Ask Volume Level 8',
             # 'Ask Volume Level 9','Ask Volume Level 10',
 
-            'Bid Price Level 1','Bid Price Level 2','Bid Price Level 3', 
+            # 'Bid Price Level 1','Bid Price Level 2','Bid Price Level 3', 
             # 'Bid Price Level 4',
             # 'Bid Price Level 5','Bid Price Level 6','Bid Price Level 7', 'Bid Price Level 8',
             # 'Bid Price Level 9','Bid Price Level 10',
             
-            'Ask Price Level 1','Ask Price Level 2','Ask Price Level 3', 
+            # 'Ask Price Level 1','Ask Price Level 2','Ask Price Level 3', 
             # 'Ask Price Level 4',
             # 'Ask Price Level 5','Ask Price Level 6','Ask Price Level 7', 'Ask Price Level 8',
             # 'Ask Price Level 9','Ask Price Level 10',
@@ -88,9 +88,9 @@ class BinaryClassifier:
             # 'Total Ask Volume 10', 
             'Price Range', 
             "Mid Price Volatility 2","Mid Price Volatility 5","Mid Price Volatility 10",
-            # 'Mid Price SMA 1', 'Mid Price SMA 2', 'Mid Price SMA 5','Mid Price SMA 10',
-            # 'Mid Price ROC',
-            # 'Mid Price EMA 1', 'Mid Price EMA 2', 'Mid Price EMA 5', 'Mid Price EMA 10',
+                #'Mid Price SMA 1', 'Mid Price SMA 2', 'Mid Price SMA 5','Mid Price SMA 10',
+            #'Mid Price ROC',
+            #'Mid Price EMA 1', 'Mid Price EMA 2', 'Mid Price EMA 5', 'Mid Price EMA 10',
             'Mid Price RSI'
         ] 
 
@@ -99,7 +99,6 @@ class BinaryClassifier:
             self.historical_inference_vectors = self.historical_inference_vectors.tail(200)
 
         X = inf_df[feature_columns]
-
 
         if X.isna().any().any():
             return False
@@ -124,13 +123,13 @@ class BinaryClassifier:
         if len(self.historical_inference_vectors) < 1:
             df["Mid Price Velocity"] = np.nan
         else:
-            df["Mid Price Velocity"] = df["Mid Price"] - self.historical_inference_vectors.iloc[-1]["Mid Price"] # df["Mid Price"].shift(1)
+            df["Mid Price Velocity"] = df["Mid Price"] - self.historical_inference_vectors.iloc[-1]["Mid Price"]
 
         # Mid Price Acceleration
         if len(self.historical_inference_vectors) < 2:
             df["Mid Price Acceleration"] = np.nan
         else:
-            df["Mid Price Acceleration"] = df["Mid Price Velocity"] - self.historical_inference_vectors.iloc[-1]["Mid Price Velocity"] # df["Mid Price Velocity"].shift(1)
+            df["Mid Price Acceleration"] = df["Mid Price Velocity"] - self.historical_inference_vectors.iloc[-1]["Mid Price Velocity"]
         
         # Bid Ask Spread
         df["Bid Ask Spread"] = (df["Bid Price Level 1"] - df["Ask Price Level 1"])
@@ -163,7 +162,7 @@ class BinaryClassifier:
         df[f"Total Ask Volume {price_level_num}"] = df[[f'Ask Volume Level {i}' for i in range(1, price_level_num+1)]].sum(axis=1)
         
         # Price Range
-        df["Price Range"] = df["Ask Price Level 10"] - df["Bid Price Level 10"]
+        df["Price Range"] = df[f"Ask Price Level {self.price_level_num}"] - df[f"Bid Price Level {self.price_level_num}"]
         
         # Time Difference
         df['Timestamp'] = pd.to_datetime(df['Timestamp'],format='ISO8601')
@@ -174,9 +173,11 @@ class BinaryClassifier:
 
         return df
 
-    def bc_time_dependent_features(self, df, windows):
+    def time_dependent_features(self, df, windows):
 
         temp_df = pd.concat([self.historical_inference_vectors, df], ignore_index = True)
+
+        mid_prices_series = temp_df["Mid Price"]
                 
         # Mid Price Volatility Calculation
         def volatility_helper(series, window):
@@ -188,7 +189,7 @@ class BinaryClassifier:
         for window in windows:
             if window == 1:
                 continue
-            df[f"Mid Price Volatility {window}"] = volatility_helper(temp_df["Mid Price"], window)
+            df[f"Mid Price Volatility {window}"] = volatility_helper(mid_prices_series, window)
 
         
 
@@ -200,7 +201,7 @@ class BinaryClassifier:
             return sum(series.tail(window)) / window
         
         for window in windows:
-            df[f"Mid Price SMA {window}"] = create_sma_helper(temp_df["Mid Price"], window)
+            df[f"Mid Price SMA {window}"] = create_sma_helper(mid_prices_series, window)
 
 
         
@@ -210,7 +211,7 @@ class BinaryClassifier:
 
             return (series.iloc[-1] - series.iloc[-2]) / (series.iloc[-2])
         
-        df[f"Mid Price ROC"] = create_rate_of_change_helper(temp_df["Mid Price"])
+        df[f"Mid Price ROC"] = create_rate_of_change_helper(mid_prices_series)
 
 
         
@@ -227,7 +228,7 @@ class BinaryClassifier:
             return ema[-1]
         
         for window in windows:
-            df[f"Mid Price EMA {window}"] = create_ema_helper(temp_df["Mid Price"], window)
+            df[f"Mid Price EMA {window}"] = create_ema_helper(mid_prices_series, window)
 
 
         
@@ -255,7 +256,7 @@ class BinaryClassifier:
             return rsi
         
 
-        df["Mid Price RSI"] = create_rsi_helper(temp_df["Mid Price"], window=14)
+        df["Mid Price RSI"] = create_rsi_helper(mid_prices_series, window=14)
 
         return df
 
